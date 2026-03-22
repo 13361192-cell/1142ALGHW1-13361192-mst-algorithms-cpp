@@ -30,6 +30,8 @@ public:
         // 1. 若 parent[x] != x，遞迴尋找根
         // 2. 可加入 path compression
         // 3. 回傳集合代表元
+        if (parent[x] != x)
+            parent[x] = find(parent[x]); // path compression
         return x; // 請修改
     }
 
@@ -38,7 +40,22 @@ public:
         // 1. 找 a, b 的根
         // 2. 若相同代表已在同一集合，回傳 false
         // 3. 否則合併兩集合，回傳 true
-        return false; // 請修改
+        // 請修改
+        int rootA = find(a);
+        int rootB = find(b);
+
+        if (rootA == rootB) return false;
+
+        // union by rank
+        if (rankv[rootA] < rankv[rootB]) {
+            parent[rootA] = rootB;
+        } else if (rankv[rootA] > rankv[rootB]) {
+            parent[rootB] = rootA;
+        } else {
+            parent[rootB] = rootA;
+            rankv[rootA]++;
+        }
+        return true;
     }
 };
 
@@ -72,9 +89,13 @@ void kruskalMST(int n, vector<Edge> edges) {
 
     // TODO:
     // Step 1. 將 edges 依照權重由小到大排序
+    sort(edges.begin(), edges.end(), [](Edge a, Edge b) {
+        return a.w < b.w;
+    });
 
     // TODO:
     // Step 2. 建立 DSU 物件
+    DSU dsu(n);
 
     cout << "Selection steps:\n";
 
@@ -83,6 +104,20 @@ void kruskalMST(int n, vector<Edge> edges) {
     //   - 若加入後不形成 cycle，則選入 mst
     //   - 否則略過
     //   - 當 mst.size() == n - 1 時停止
+    for (auto& e : edges) {
+        if (dsu.unite(e.u, e.v)) {
+            cout << "Select: ";
+            printEdge(e);
+            cout << "\n";
+            mst.push_back(e);
+        } else {
+            cout << "Skip (cycle): ";
+            printEdge(e);
+            cout << "\n";
+        }
+
+        if (mst.size() == n - 1) break;
+    }
 
     printMST(mst);
     cout << "\n";
@@ -109,9 +144,13 @@ void primMST(int n, const vector<vector<pair<int, int>>>& adj, int start = 1) {
 
     // TODO:
     // Step 1. 將起點 start 設為已加入 MST
+     inMST[start] = true;
 
     // TODO:
     // Step 2. 把 start 相鄰的邊放入 priority queue
+      for (auto& [to, w] : adj[start]) {
+        pq.push({w, start, to});
+    }
 
     cout << "Selection steps:\n";
 
@@ -121,6 +160,23 @@ void primMST(int n, const vector<vector<pair<int, int>>>& adj, int start = 1) {
     //   - 若 to 已在 MST 中，跳過
     //   - 否則加入此邊到 mst，並把新頂點標記進 MST
     //   - 再將新頂點可到達的候選邊放入 pq
+     while (!pq.empty() && mst.size() < n - 1) {
+        auto [w, u, v] = pq.top();
+        pq.pop();
+
+        if (inMST[v]) continue;
+
+        cout << "Select: " << u << " - " << v << " : " << w << "\n";
+
+        inMST[v] = true;
+        mst.push_back({u, v, w});
+
+        for (auto& [to, weight] : adj[v]) {
+            if (!inMST[to]) {
+                pq.push({weight, v, to});
+            }
+        }
+    }
 
     printMST(mst);
     cout << "\n";
@@ -139,6 +195,7 @@ void boruvkaMST(int n, const vector<Edge>& edges) {
     // TODO:
     // Step 1. 建立 DSU
     // Step 2. 初始 component 數量為 n
+    DSU dsu(n);
 
     int numComponents = n;
     int round = 1;
@@ -156,6 +213,18 @@ void boruvkaMST(int n, const vector<Edge>& edges) {
         //   set2 = find(edges[i].v)
         //   若 set1 == set2，代表同一 component，跳過
         //   否則更新 cheapest[set1] 與 cheapest[set2]
+        for (int i = 0; i < edges.size(); i++) {
+            int set1 = dsu.find(edges[i].u);
+            int set2 = dsu.find(edges[i].v);
+
+            if (set1 == set2) continue;
+
+            if (cheapest[set1] == -1 || edges[i].w < edges[cheapest[set1]].w)
+                cheapest[set1] = i;
+
+            if (cheapest[set2] == -1 || edges[i].w < edges[cheapest[set2]].w)
+                cheapest[set2] = i;
+        }
 
         bool merged = false;
 
@@ -165,6 +234,21 @@ void boruvkaMST(int n, const vector<Edge>& edges) {
         //   - 加入 mst
         //   - numComponents--
         //   - merged = true
+        for (int i = 1; i <= n; i++) {
+            if (cheapest[i] != -1) {
+                Edge e = edges[cheapest[i]];
+
+                if (dsu.unite(e.u, e.v)) {
+                    cout << "Select: ";
+                    printEdge(e);
+                    cout << "\n";
+
+                    mst.push_back(e);
+                    numComponents--;
+                    merged = true;
+                }
+            }
+        }
 
         if (!merged) break;
 
